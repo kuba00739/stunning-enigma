@@ -103,19 +103,23 @@ if [[ $ip = "-" ]]; then
 fi
 
 if [[ $d = "y" || $airmon = "y" ]]; then
+	echo "Running airmon-ng check kill"
 	/usr/sbin/airmon-ng check kill
 fi
 
 if [[ $d = "y" || $dnsmasq = "y" ]]; then
+	echo "Killing dnsmasq"
 	/usr/bin/killall dnsmasq
 fi
 
 if [[ $d = "y" || $m = "y" ]]; then
+	echo "Creating /sys/fs/cgroup/systemd directory and mounting cgroup"
 	/usr/bin/mkdir /sys/fs/cgroup/systemd
 	/usr/bin/mount -t cgroup -o none,name=systemd cgroup /sys/fs/cgroup/systemd/
 fi
 
 if [[ $d = "y" || $P = "y" ]]; then
+	echo "Starting docker pihole"
 	/usr/bin/docker rm pihole
 	/usr/bin/docker run -p 53:53/tcp -p 80:80/tcp -p 53:53/udp --env WEBPASSWORD=Adam1000 --name pihole -d pihole/pihole #-p 67:67/udp for DHCP
 fi
@@ -123,12 +127,12 @@ fi
 /usr/sbin/ip addr add $ip dev $interface
 
 if [[ $d = "y" || $dnsmasq = "y" ]]; then
+	echo "Starting dnsmasq"
 	/usr/sbin/dnsmasq -C /etc/dnsmasq.conf -i $interface
 fi
 
-/usr/sbin/hostapd /etc/hostapd/hostapd.conf -i $interface
-
 if [[ $routing = "y" || $d = "y" ]]; then
+	echo "Adding routing rules to iptables"
 	iptables -A INPUT -i lo -j ACCEPT
 	iptables -A INPUT -i $interface -j ACCEPT
 	iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
@@ -136,3 +140,6 @@ if [[ $routing = "y" || $d = "y" ]]; then
 	iptables -A FORWARD -i $exit_interface -o $interface -m state --state RELATED,ESTABLISHED -j ACCEPT
 	iptables -A FORWARD -i $interface -o $exit_interface -j ACCEPT
 fi
+
+echo "Starting hostapd"
+/usr/sbin/hostapd /etc/hostapd/hostapd.conf -i $interface
