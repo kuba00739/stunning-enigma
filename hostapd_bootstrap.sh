@@ -8,8 +8,8 @@ if [[ ${PIPESTATUS[0]} -ne 4 ]]; then
 	exit 1
 fi
 
-OPTIONS=Pdmahi:
-LONGOPTS=pihole,default,ip:,dnsmasq,mount,airmon,help,interface:
+OPTIONS=Pdmahi:re:
+LONGOPTS=pihole,default,ip:,dnsmasq,mount,airmon,help,interface:,routing,exit_int:
 
 ! PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@")
 if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
@@ -18,10 +18,14 @@ fi
 
 eval set -- "$PARSED"
 
-P=n d=n ip=- dnsmasq=n m=n airmon=n help_flag=n interface=-
+P=n d=n ip=- dnsmasq=n m=n airmon=n help_flag=n interface=- routing=n exit_interface=-
 
 while true; do
 	case "$1" in
+		-r|--routing)
+			routing="y"
+			shift
+			;;
 		-d|--default)
 			d="y"
 			shift
@@ -44,6 +48,10 @@ while true; do
 			;;
 		-i|--interface)
 			interface="$2"
+			shift 2
+			;;
+		-e|--exit_interface)
+			exit_interface="$2"
 			shift 2
 			;;
 		-a|--airmon)
@@ -73,7 +81,9 @@ if [[ $help_flag = "y" ]]; then
 		--dnsmasq	With this option script will kill any instance of dnsmasq and start a new one\n\
 	-m	--mount		Will create /sys/fs/cgroup/systemd directory and mount cgroup (for pihole)\n\
 	-i	--interface	Set interface to use with AP.\n\
+	-e	--exit_int	Sets and exit interface name\n\
 	-a	--airmon	Will use airmon-ng to kill problematic services\n\
+	-r	--routing	Sets iptables rules for routing beetween AP interface and exit interface\n\
 	-h	--help		You know what it does
 \n\
 Written by Jakub Niezabitowski, 2021.\n\n"
@@ -82,6 +92,10 @@ fi
 
 if [[ $interface = "-" ]]; then
 	interface="wlo1"
+fi
+
+if [[ $exit_interface = "-" ]]; then
+	exit_interface="wlp0s20f0u1"
 fi
 
 if [[ $ip = "-" ]]; then
@@ -113,3 +127,12 @@ if [[ $d = "y" || $dnsmasq = "y" ]]; then
 fi
 
 /usr/sbin/hostapd /etc/hostapd/hostapd.conf -i $interface
+
+if [[ $routing = "y" || $d = "y" ]]; then
+	iptables -A INPUT -i lo -j ACCEPT
+	iptables -A INPUT -i $interface -j ACCEPT
+	iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+	iptables -t nat -A POSTROUTING -o $exit_interface -j MASQUERADE
+	iptables -A FORWARD -i $exit_interface -o $interface -m state --state RELATED,ESTABLISHED -j ACCEPT
+	iptables -A FORWARD -i $interface -o $exit_interface -j ACCEPT
+fi
