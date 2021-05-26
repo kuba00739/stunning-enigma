@@ -17,4 +17,6 @@ Flag -a runs airmon-ng check kill to kill all services which can affect AP.
 
 Flag -r creates iptables rules for routing.
 
+Remember to change WEBPASSWORD for pihole!
+
 Tested on Fedora 33 and 34.
